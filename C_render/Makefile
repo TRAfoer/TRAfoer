@@ -7,7 +7,7 @@ LDLIBS ?= -lopengl32 -lgdi32 -lm
 TARGET ?= main
 SOURCES := main.c tigr.c
 DEPENDENCIES := tigr.h olive.c openPPMp6.c
-
+CPPFLAGS += -DTIGR_DO_NOT_PRESERVE_WINDOW_POSITION
 .DEFAULT_GOAL := all
 .DELETE_ON_ERROR:
 .PHONY: all run clean
