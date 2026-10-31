@@ -23,8 +23,17 @@ void my_exit(void)
     system("clear");
     printf("Exit with Clear \n");
     if(data!=NULL)free(data);
+    
 }
-signed main(){
+struct point
+{
+    float x;
+    float y;
+    float z;
+    uint32_t Col;
+};
+signed main()
+{
     data=malloc(256*256*sizeof(uint32_t));
     atexit (my_exit);
     srand((uint32_t)time(NULL));
@@ -43,43 +52,59 @@ signed main(){
         // OLIVEC_PIXEL(image, i, i)
         image.pixels[   i*pw+j]=OLIVEC_RGBA(rand()%255,rand()%255,rand()%255,rand()%255);
     }
-    
-    
+    struct point pts[11][11][11];
+    for (int i = 0; i < 10; ++i)
+        for(int j=0;j<10;++j)
+            for (int k = 0; k < 10; ++k){
+                struct point *p=&pts[i][j][k];
+                p->x = (i - 5) * 40 + rand() % 10;
+                p->y = (j - 5) * 30 + rand() % 10;
+                p->z = (k - 5) * 30 + rand() % 10;
+                p->Col = OLIVEC_RGBA(rand() % 255, rand() % 255, rand() % 255, 150);
+            }
     system("clear");
     while (!tigrClosed(screen))
     {
-        if (tigrKeyDown(screen, TK_CONTROL) && tigrKeyDown(screen, 'Q'))
+        if (tigrKeyHeld(screen, TK_CONTROL) && tigrKeyDown(screen, 'Q'))
         {
             printf("12121");
-           
+            break;
         }
-        timeDt+=50;
-        olivec_fill(canvas, 0xFF000000);                        // 清背景（不透明黑）
-        olivec_line(canvas,0,0,WIDTH-1,HIGHT-1,0xFF00AAFF);
-        olivec_circle(canvas,WIDTH/2,HIGHT/2,20.0+(sinf(((float)timeDt)/200)*15),0x55FF00FF);
+        const float CAMERA_DIST = 400.0f; // 必须 > 物体最大 |z| (150) + 余量
+        const float FOCAL = 400.0f;       // 焦距，越大透视越弱
+        const float NEAR = 1.0f;
 
-        olivec_triangle3c(canvas,0,0,WIDTH-1,HIGHT/2,0,HIGHT-1,0xFF00FF00,0X00FF0000,0XFF0000FF);
-        olivec_sprite_blend(canvas,5,5,5+pw,5+ph,image);
-        float z1=2+sin((double)timeDt/1000.0);
-        float z3=2-sin((double)timeDt/1000.0);
-        olivec_triangle3z(
-            canvas,
-            (WIDTH/2+15)/z1,15/z1,
-            WIDTH/2+50,15,
-            (WIDTH/2+15)/z3,100/z3,
-            z1,1,z3
-        );
-        olivec_triangle3uv(canvas,100,50
-            ,125,100
-            ,60,113,
-            0,0
-            ,1,0.5
-            ,0,1,
-            1,1,1,image);
-        olivec_text(canvas, "mann",(timeDt/50)%WIDTH,rand()%5+HIGHT/4,olivec_default_font,1,0xFFFFFFFF);
+        timeDt += 50;
+        const float alp = (float)timeDt / 5000.0f;
+        const float cosA = cosf(alp);
+        const float sinA = sinf(alp);
+
+        olivec_fill(canvas, 0xff000000);
+
+        for (int i = 0; i < 10; ++i)
+            for (int j = 0; j < 10; ++j)
+                for (int k = 0; k < 10; ++k)
+                {
+                    struct point p = pts[i][j][k]; // 从原始位置旋转（不累积）
+
+                    // ---- 绕 Y 轴旋转：用临时变量，避免读到修改后的 p.x ----
+                    float rx = p.x * cosA - p.z * sinA;
+                    float rz = p.x * sinA + p.z * cosA;
+                    float ry = p.y;
+
+                    // ---- 透视投影 ----
+                    float z_view = rz + CAMERA_DIST;
+                    if (z_view < NEAR)
+                        z_view = NEAR;
+
+                    float scale = FOCAL / z_view;
+                    int sx = (int)(rx * scale + WIDTH / 2);
+                    int sy = (int)(-ry * scale + HIGHT / 2); // y 轴翻转
+
+                    olivec_circle(canvas, sx, sy, 3, p.Col);
+                }
         // memcpy(, pixels, WIDTH * HIGHT * sizeof(TPixel));
         tigrUpdate(screen);
-        _sleep(16);
     }
     
     tigrFree(screen);

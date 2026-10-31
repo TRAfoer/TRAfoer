@@ -2141,7 +2141,7 @@ void tigrUpdate(Tigr* bmp) {
     win->scrollDeltaY = 0;
 
     // Run the message pump.
-    while (PeekMessage(&msg, (HWND)bmp->handle, 0, 0, PM_REMOVE)) {
+    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
         if (msg.message == WM_QUIT)
             break;
 
