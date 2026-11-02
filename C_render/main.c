@@ -11,8 +11,8 @@
 #include "olive.c"
 #include "openPPMp6.c"
 
-#define WIDTH 1800
-#define HIGHT 900
+#define WIDTH 800
+#define HIGHT 600
 
 #define PTX 15
 #define PTY 15

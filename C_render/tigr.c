@@ -4546,6 +4546,7 @@ void tigr_android_destroy();
 #include <string.h>
 #include <stdarg.h>
 #include <sys/time.h>
+#include <string.h>
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xlocale.h>
