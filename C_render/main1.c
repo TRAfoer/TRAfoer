@@ -9,7 +9,7 @@
 #define OLIVEC_IMPLEMENTATION
 #include "tigr.h"
 #include "olive.c"
-#include "openPPMp6.c"
+#include "openPPMp6.c"`
 
 #define WIDTH 800
 #define HIGHT 600
