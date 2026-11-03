@@ -7,6 +7,7 @@ ifeq ($(UNAME_S), Linux)
 	LDLIBS ?= -lGLU -lGL -lX11 -lm
 else
 	LDLIBS ?= -lopengl32 -lgdi32 -lm
+endif
 TARGET ?= main
 SOURCES := main.c tigr.c
 DEPENDENCIES := tigr.h olive.c openPPMp6.c
