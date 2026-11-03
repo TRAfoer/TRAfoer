@@ -38,14 +38,16 @@ static void AddAnima(SigAnimaGroup gp,SIGAnimation anima){
 static float Evaluate(SIGAnimation anima,float time){
     if(time-anima.startTime<=0)return 0;
     if(time-anima.startTime>=anima.duration)return 1;
-    return pow(lerp(time,anima.startTime,anima.startTime+anima.duration),anima.power);
+    float t = lerp(time, anima.startTime, anima.startTime + anima.duration);
+    return t;
+    return pow(t, anima.power);
 }
 /* p = 峰值位置。t=1 时约 0.02 左右，肉眼看不出来 */
 static float spike_fast(SIGAnimation anima,float time,float p)
 {
     if(time-anima.startTime<=0)return 0;
-    if(time-anima.startTime>=anima.duration)return 1;
-    float t=lerp(time,anima.startTime,anima.startTime+anima.duration);
+    if(time-anima.startTime>=anima.duration)return 0;
+    float t=1.0-lerp(time,anima.startTime,anima.startTime+anima.duration);
     if (t <= 0.0f) return 0.0f;
     float u = t / p;
     return u * expf(1.0f - u);
