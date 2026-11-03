@@ -4,6 +4,7 @@
 #include<time.h>
 #include<math.h>
 #include<stdint.h>
+#include<stdbool.h>
 
 #define TIGR_IMPLEMENTATION
 #define OLIVEC_IMPLEMENTATION
@@ -21,11 +22,13 @@
 #define PTY 15
 #define PTZ 15
 #define PTMUL 160
-#define SOILD_BLOCK_HALF_UP "▀"//
 
+bool IsRunning=false;
 uint64_t timeDt=0;
-uint32_t *data;
-#define RandomCol 0
+uint32_t *ImageData;
+uint32_t *TextureData;
+Olivec_Canvas textureCanvas;
+
 void my_exit(void)
 {
     system("clear");
@@ -41,11 +44,14 @@ uint32_t Cols[]={OLIVEC_RGBA(220,20,60,255),OLIVEC_RGBA(255,69,0,255),
                  OLIVEC_RGBA(240,230,140,255),OLIVEC_RGBA(250,250,210,255)};
 SIGAnimation TrackAnimas[4];
 
-int sigWidth=100;
-float downMul=0.8;
+int sigWidth=130;
+float downMul=0.9;
 float speedMul=600.0;
+float TrackOffset=25;
 
-double CurTime=0;
+double CurTime=-2;
+int framecount=0;
+float AnimaVals[4];
 
 struct Note
 {
@@ -62,28 +68,39 @@ void InitTempNotes(struct Note *nts,int count){
     }
 }
 void DrawNotes(struct Note *nts,int count,float CurB){
+    float valdelta[6];
+    valdelta[0] =-AnimaVals[0]             ;
+    valdelta[1] =+AnimaVals[0]-AnimaVals[1];
+    valdelta[2] =+AnimaVals[1]-AnimaVals[2];
+    valdelta[3] =+AnimaVals[2]-AnimaVals[3];
+    valdelta[4] =+AnimaVals[3]             ;
     const int NtThickness=20;
     for(int i =0;i<count;++i){
-        if(nts[i].Beats<CurB)continue;
-        int posY=(HIGHT*downMul)-((nts[i].Beats-CurB)*speedMul)-(NtThickness/2);
-        if(posY<0)continue;
-        int posX=((nts[i].index)*sigWidth)+(WIDTH/2-2*sigWidth);
         uint32_t col=Cols[nts[i].index];
-        olivec_rect(canvas,posX,posY,sigWidth,NtThickness,col);
+        int posY=(HIGHT*downMul)-((nts[i].Beats-CurB)*speedMul)-(NtThickness/2);
+        if(nts[i].Beats<CurB)col=OLIVEC_RGBA(OLIVEC_RED(col),OLIVEC_GREEN(col),OLIVEC_BLUE(col),50);
+        if(posY<0||posY>HIGHT)continue;
+        int posX=((nts[i].index)*sigWidth)+(WIDTH/2-2*sigWidth);
+        olivec_rect(canvas,posX+valdelta[nts[i].index],posY,sigWidth-+valdelta[nts[i].index]+valdelta[nts[i].index+1],NtThickness,col);
 }}
 void DrawLiness(){
-    float vals[4];
-    for(int i=0;i<4;++i)vals[i]=(1.0-Evaluate(TrackAnimas[i],CurTime))*10;
-
-    olivec_line(canvas,(WIDTH/2-2*sigWidth)-vals[0]        ,0,(WIDTH/2-2*sigWidth)-vals[0]        ,HIGHT-1,0xffffffff);
-    olivec_line(canvas,(WIDTH/2-sigWidth  )+vals[0]-vals[1],0,(WIDTH/2-sigWidth  )+vals[0]-vals[1],HIGHT-1,0xffffffff);
-    olivec_line(canvas,(WIDTH/2           )+vals[1]-vals[2],0,(WIDTH/2           )+vals[1]-vals[2],HIGHT-1,0xffffffff);//0
-    olivec_line(canvas,(WIDTH/2+sigWidth  )+vals[2]-vals[3],0,(WIDTH/2+sigWidth  )+vals[2]-vals[3],HIGHT-1,0xffffffff);
-    olivec_line(canvas,(WIDTH/2+2*sigWidth)+vals[3]        ,0,(WIDTH/2+2*sigWidth)+vals[3]        ,HIGHT-1,0xffffffff);
-    
+    int liness[]={
+        (WIDTH/2-2*sigWidth)-AnimaVals[0]             ,
+        (WIDTH/2-sigWidth  )+AnimaVals[0]-AnimaVals[1],
+        (WIDTH/2           )+AnimaVals[1]-AnimaVals[2],
+        (WIDTH/2+sigWidth  )+AnimaVals[2]-AnimaVals[3],
+        (WIDTH/2+2*sigWidth)+AnimaVals[3]             ,
+    };
+    for(int i=0;i<4;++i){
+        olivec_triangle3c(canvas,liness[i]+1,0,liness[i]+1,(HIGHT-1)*downMul,liness[i+1]-1,(HIGHT-1)*downMul,0xff000000,Cols[i]/2,Cols[i]/2);
+        olivec_triangle3c(canvas,liness[i+1]-1,(HIGHT-1)*downMul,liness[i+1]-1,0,liness[i]+1,0,Cols[i]/2,0xff000000,0xff000000);
+    }
     olivec_line(canvas,0,HIGHT*downMul,WIDTH-1,HIGHT*downMul,0xffffffff);
 }
 void InputDetect(Tigr *screen){
+    if(tigrKeyDown(screen,TK_SPACE)){
+        IsRunning=!IsRunning;
+    }
     for(int i=0;i<4;++i){
         if(tigrKeyDown(screen,Keys[i])){
             TrackAnimas[i].startTime=CurTime;
@@ -95,8 +112,8 @@ float BPM=120;
 signed main()
 {
     float TpB=60.0/BPM;
-
-    data=malloc(256*256*sizeof(uint32_t));
+    TextureData=malloc(128*128*sizeof(uint32_t));
+    ImageData=malloc(256*256*sizeof(uint32_t));
     atexit (my_exit);
     srand((uint32_t)time(NULL));
     Tigr *screen = tigrWindow(WIDTH, HIGHT, "TEST-ONE", TIGR_FIXED);
@@ -108,10 +125,15 @@ signed main()
     }
     //图片读取部分
     int pw,ph;
-    int err=openPPMp6("test.ppm",data,&pw,&ph);
-    if(err)printf("ERR!");
+    int err=openPPMp6("test.ppm",ImageData,&pw,&ph);
+    if(err)printf("ERR when1!");
+    int tw,th;
+    err=openPPMp6("TEXTURE.ppm",TextureData,&tw,&th);
+    if(err)printf("ERR when2!");
+
     Olivec_Canvas image;
-    image=olivec_canvas(data, pw, ph, pw);
+    image=olivec_canvas(ImageData, pw, ph, pw);
+    textureCanvas=olivec_canvas(TextureData,tw,th,tw);
 
     const int Notecount=128;
     struct Note index[Notecount];
@@ -124,10 +146,17 @@ signed main()
     
     while (!tigrClosed(screen)&&!tigrKeyHeld(screen,'Q'))
     {
-        CurTime+=tigrTime();
+        if(IsRunning)CurTime+=tigrTime();
+        framecount+=tigrTime()*1000;
         float Bts=CurTime/TpB;
+        time_t Fstart=clock();
         olivec_fill(canvas,0xFF181818);
         InputDetect(screen);
+        for(int i=0;i<4;++i)AnimaVals[i]=spike_fast(TrackAnimas[i],CurTime,10)*10;
+
+        float all=0;
+        for(int i=0;i<4;++i) all+=AnimaVals[i];
+        
         {
         float triangle_angle = 0.5f*PI*CurTime;
 
@@ -138,7 +167,7 @@ signed main()
             {1, 1},
             {0, 1},
         };
-        float len = WIDTH/16;
+        float len = WIDTH/16+all;
         for (size_t i = 0; i < 4; ++i) {
             ps[i][0] = WIDTH/16+10  + cosf(PI/2*i + triangle_angle)*len;
             ps[i][1] = HIGHT/16+10  + sinf(PI/2*i + triangle_angle)*len;
@@ -162,17 +191,25 @@ signed main()
         
         }
         
-        DrawNotes(index,Notecount,Bts);
         DrawLiness();
+        DrawNotes(index,Notecount,Bts);
 
         char str1[24];
-        char str2[24];
+        char str2[32];
         sprintf(str1,"%7.5lf %7.5lf",CurTime,Bts);
-        sprintf(str2,"fps equ %7.5lf",1.0/tigrTime());
+        float Fdt=((float)(clock()-Fstart))/CLOCKS_PER_SEC*1000;
+        sprintf(str2,"dt equ %7.5lf  q 2 quit",Fdt);
         olivec_text(canvas,str1,10,HIGHT-100,olivec_default_font,2,0xffFFBF00);
         olivec_text(canvas,str2,10,HIGHT-100+20,olivec_default_font,2,0xffFFBF00);
-
-
+        const char ct[]="space 2 ctn and q 2 qt";
+        const char ct2[]="olivec is fucking good";
+        if(!IsRunning){
+            olivec_rect(canvas,0,0,WIDTH-1,HIGHT-1,0xaa000000);
+            olivec_text(canvas,ct,WIDTH/2-((sizeof(ct)/sizeof(char))*olivec_default_font.width/2)*4,HIGHT/2-100,olivec_default_font,4,0xffffffff);
+            olivec_text(canvas,ct2,WIDTH/2-((sizeof(ct2)/sizeof(char))*olivec_default_font.width/2)*4,HIGHT/2,olivec_default_font,4,0xffffffff);
+            // TPixel p;p.a=255,p.r=255,p.g=255,p.b=255;
+            // tigrPrint(screen,tfont,0,0,p,ct);
+        }
         tigrUpdate(screen);
     }
     tigrFree(screen);

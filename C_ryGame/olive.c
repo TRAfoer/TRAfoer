@@ -534,15 +534,19 @@ OLIVECDEF Olivec_Canvas olivec_subcanvas(Olivec_Canvas oc, int x, int y, int w, 
 
 OLIVECDEF void olivec_blend_color(uint32_t *c1, uint32_t c2)
 {
+    uint32_t a1 = OLIVEC_ALPHA(*c1);
     uint32_t r1 = OLIVEC_RED(*c1);
     uint32_t g1 = OLIVEC_GREEN(*c1);
     uint32_t b1 = OLIVEC_BLUE(*c1);
-    uint32_t a1 = OLIVEC_ALPHA(*c1);
 
+    uint32_t a2 = OLIVEC_ALPHA(c2);
+    if(a2==255){
+        memcpy(c1,&c2,sizeof(uint32_t));
+        return;
+    }
     uint32_t r2 = OLIVEC_RED(c2);
     uint32_t g2 = OLIVEC_GREEN(c2);
     uint32_t b2 = OLIVEC_BLUE(c2);
-    uint32_t a2 = OLIVEC_ALPHA(c2);
 
     r1 = (r1*(255 - a2) + r2*a2)/255; if (r1 > 255) r1 = 255;
     g1 = (g1*(255 - a2) + g2*a2)/255; if (g1 > 255) g1 = 255;
@@ -566,8 +570,9 @@ OLIVECDEF void olivec_rect(Olivec_Canvas oc, int x, int y, int w, int h, uint32_
     if (!olivec_normalize_rect(x, y, w, h, oc.width, oc.height, &nr)) return;
     for (int x = nr.x1; x <= nr.x2; ++x) {
         for (int y = nr.y1; y <= nr.y2; ++y) {
+            
             olivec_blend_color(&OLIVEC_PIXEL(oc, x, y), color);
-        }
+            }
     }
 }
 
