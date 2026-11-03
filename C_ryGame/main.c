@@ -103,7 +103,7 @@ void DrawLiness(){
     };
     
     for(int i=0;i<4;++i){
-        uint32_t Upcol = pressState[i]?Cols[i]/3:0xff000000;
+        uint32_t Upcol = pressState[i]?0xff222222:0xff000000;
         // olivec_blend_color(&Upcol, Cols[i] * AnimaVals[i]);
         olivec_triangle3c(canvas, liness[i] + 1, 0, liness[i] + 1, (HIGHT - 1) * downMul, liness[i + 1] - 1, (HIGHT - 1) * downMul, Upcol, Cols[i] / 2, Cols[i] / 2);
         olivec_triangle3c(canvas, liness[i + 1] - 1, (HIGHT - 1) * downMul, liness[i + 1] - 1, 0, liness[i] + 1, 0, Cols[i] / 2, Upcol, Upcol);
@@ -127,7 +127,7 @@ void InputDetect(Tigr *screen){
         }
     }
 }
-float BPM=120;
+float BPM=170;
 signed main()
 {
     float TpB=60.0/BPM;
@@ -138,9 +138,9 @@ signed main()
     Tigr *screen = tigrWindow(WIDTH, HIGHT, "TEST-ONE", TIGR_FIXED);
     canvas=olivec_canvas((uint32_t*)(screen->pix), WIDTH, HIGHT, WIDTH);
     for(int i=0;i<4;++i){
-        TrackAnimas[i].duration=-1;
+        TrackAnimas[i].startTime=-1;
         TrackAnimas[i].power=0.2;
-        TrackAnimas[i].duration=0.2;
+        TrackAnimas[i].duration=0.05;
     }
     //图片读取部分
     int pw,ph;
@@ -175,7 +175,7 @@ signed main()
     {
         if(IsRunning){
             CurTime+=tigrTime();
-            if(engineisstop){
+            if(CurTime>=0&&engineisstop){
                 engineisstop=false;
                 ma_sound_start(&sound);
             }
@@ -192,20 +192,21 @@ signed main()
         for(int i=0;i<4;++i) all+=AnimaVals[i];
         
         {
-        float triangle_angle = 0.5f*PI*CurTime;
+            float triangle_angle = 0.5f * PI * CurTime;
 
-        float ps[4][2];
-        float uvs[4][2] = {
-            {0, 0},
-            {1, 0},
-            {1, 1},
-            {0, 1},
-        };
-        float len = WIDTH/16+(all*10);
-        for (size_t i = 0; i < 4; ++i) {
-            ps[i][0] = WIDTH/16+10  + cosf(PI/2*i + triangle_angle)*len;
-            ps[i][1] = HIGHT/16+10  + sinf(PI/2*i + triangle_angle)*len;
-        }
+            float ps[4][2];
+            float uvs[4][2] = {
+                {0, 0},
+                {1, 0},
+                {1, 1},
+                {0, 1},
+            };
+            float len = WIDTH / 16 + (all + (pow(1.0-fmod(Bts, 1.0), 3))) * 10;
+            for (size_t i = 0; i < 4; ++i)
+            {
+                ps[i][0] = WIDTH / 16 + 10 + cosf(PI / 2 * i + triangle_angle) * len;
+                ps[i][1] = HIGHT / 16 + 10 + sinf(PI / 2 * i + triangle_angle) * len;
+            }
         for (size_t i = 0; i < 2; ++i) {
             int i1 = (i*2 + 0)%4;
             int i2 = (i*2 + 1)%4;
