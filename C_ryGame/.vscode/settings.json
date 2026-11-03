@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "cstdint": "c",
+        "ranges": "cpp",
+        "stdlib.h": "c",
+        "stdio.h": "c"
+    }
+}
