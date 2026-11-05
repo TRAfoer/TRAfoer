@@ -1,4 +1,5 @@
 #include "jsonLib.h"
+#include <errno.h>
 
 /*定义一些不需要暴露的功能*/
 /*
@@ -1940,10 +1941,15 @@ pJsonArrayNode JSONParseArray(char* input /* in */) {
 					idx++;
 				}
 				idx--;
-				sscanf(input + idx, "%lf", &num);
+				/*
+				 * 从 i（数字首位）开始解析，而不是 idx（数字末位）。
+				 * idx-- 只是为了后面 i = idx + 1 能跳到下一个元素。
+				 * 原实现从末位解析："10" 会变成 0、"37" 会变成 7。
+				 */
+				sscanf(input + i, "%lf", &num);
 				if(num > 2100000000 && !not_long){
 					UINT64 lNum = 0;
-					sscanf(input + idx, "%llu", &lNum);
+					sscanf(input + i, "%llu", &lNum);
 					JSONArrayPushLongNumber(pArray, lNum);
 				}else {
 					JSONArrayPushNumber(pArray, num);
@@ -2102,30 +2108,40 @@ pJsonObjectNode JSONParseObject(char* input /* in */) {
 						valIdx = idx + 4;
 					}
 				}
-				else if ((input[idx] >= '0' && input[idx] <= '9') || input[idx] == '-') {
-					// 值是 number 或 long long
-					valIdx = idx + 1;
-					int not_long = 0;
-					while (valIdx <= len - 2) {
-						if(input[valIdx] == '.' || input[valIdx] == '-'){
-							not_long = 1;
-						}
-						if (input[valIdx] == ',') {
-							break;
-						}
-						valIdx++;
-					}
-					valIdx--;
-					double num = 0;
-					sscanf(input + idx, "%lf", &num);
-					if(num > 2100000000 && !not_long){
-						UINT64 lNum = 0;
-						sscanf(input + idx, "%llu", &lNum);
-						JSONSetLongNumberAttr(pObject, key, lNum);
-					}else {
-						JSONSetNumberAttr(pObject, key, num);
-					}
-				}
+				                else if ((input[idx] >= '0' && input[idx] <= '9') || input[idx] == '-') {
+                    // 值是 number 或 long long
+                    char* end = NULL;
+                    errno = 0;
+                    double num = strtod(input + idx, &end);
+
+                    if (end == input + idx || errno == ERANGE) {
+                        // 非法数字
+                        free(key);
+                        break;
+                    }
+
+                    // end 落在分隔符上 ⇒ 整个片段是纯整数，没有 . / e / E
+                    int is_int = (*end == ',' || *end == '}' || *end == ']' ||
+                                 *end == ' ' || *end == '\t' || *end == '\n' ||
+                                 *end == '\r' || *end == '\0');
+
+                    if (is_int) {
+                        errno = 0;
+                        long long ll = strtoll(input + idx, &end, 10);
+                        if (end != input + idx && errno != ERANGE &&
+                            (ll > __INT_MAX__ || ll < -__INT_MAX__)) {
+                            // 注意：接口若是 UINT64，负大数语义需另行处理
+                            JSONSetLongNumberAttr(pObject, key, (UINT64)ll);
+                        } else {
+                            JSONSetNumberAttr(pObject, key, (double)ll);
+                        }
+                    } else {
+                        JSONSetNumberAttr(pObject, key, num);
+                    }
+
+                    // 保持原语义：valIdx 指向数字最后一个字符，外层统一 i = valIdx + 1
+                    valIdx = (int)(end - input) - 1;
+                }
 				else if (input[idx] == '[') {
 					// 值是 array
 					valIdx = idx + 1;

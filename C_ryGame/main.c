@@ -61,13 +61,15 @@ int sigWidth = 130;
 float downMul=0.9;
 float speedMul=450.0;
 float TrackOffset=25;
+float BPM=170;
+float offset=0;
+
 
 double CurTime=-2;
-int framecount=0;
 float AnimaVals[4];
 
 void InitNotes(struct Note *nts,int *count){
-    ReadRaw("1.txt",nts,count);
+    ReadMalodyJson("Test.json",&nts,count,&BPM);
 }
 void DrawNotes(struct Note *nts,int count,float CurB){
     float valdelta[6];
@@ -124,13 +126,10 @@ void InputDetect(Tigr *screen){
         }
     }
 }
-float BPM=170;
 
-float offset=0;
 signed main()
 {
     
-    float TpB=60.0/BPM;
     TextureData=malloc(128*128*sizeof(uint32_t));
     ImageData=malloc(256*256*sizeof(uint32_t));
     atexit (my_exit);
@@ -174,22 +173,33 @@ signed main()
     int Notecount=0;
     struct Note *nts=malloc(sizeof(struct Note)*25565);
     InitNotes(nts,&Notecount);
+    
+    float TpB=60.0/BPM;
 
     if(sizeof(Keys)/sizeof(char)<4){
         return 1;
     }
     CurTime+=offset;
     int adjc=0;
+    float lastDt=-1;
     while (!tigrClosed(screen)&&!tigrKeyHeld(screen,'Q'))
     {
+        float Dt=tigrTime();
+        if(lastDt>0){
+            float Tmp=Dt;
+
+            Dt=(Dt+lastDt)/2;
+            lastDt=Tmp;
+
+        }else
+        lastDt=Dt;
         if(IsRunning){
-            CurTime+=tigrTime();
+            CurTime+=Dt;
             if(CurTime>=0&&engineisstop){
                 engineisstop=false;
                 ma_sound_start(&sound);
             }
         }
-        framecount+=tigrTime()*1000;
         float Bts=CurTime/TpB;
         time_t Fstart=clock();
         for(int i=0;i<4;++i)
@@ -252,9 +262,9 @@ signed main()
 
         char str1[32];
         char str2[32];
-        sprintf(str1,"%7.5lf %7.5lf",CurTime,Bts);
+        sprintf(str1,"%d %7.5lf %7.5lf",Notecount,CurTime,Bts);
         float Fdt=((float)(clock()-Fstart))/CLOCKS_PER_SEC*1000;
-        sprintf(str2,"dt equ %7.5lf  q 2 quit",Fdt);
+        sprintf(str2,"dt equ %7.5lf  q 2 quit",Dt);
         olivec_text(canvas,str1,10,HIGHT-100,olivec_default_font,2,0xffFFBF00);
         olivec_text(canvas,str2,10,HIGHT-100+20,olivec_default_font,2,0xffFFBF00);
         const char ct[]="space 2 ctn and q 2 qt";
