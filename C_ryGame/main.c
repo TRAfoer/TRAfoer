@@ -129,7 +129,7 @@ float BPM=170;
 float offset=0;
 signed main()
 {
-
+    
     float TpB=60.0/BPM;
     TextureData=malloc(128*128*sizeof(uint32_t));
     ImageData=malloc(256*256*sizeof(uint32_t));
