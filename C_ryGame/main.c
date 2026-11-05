@@ -16,6 +16,7 @@
 #include "miniaudio.h"
 #include "ChatReader.c"
 #include "NoteDef.h"
+#include "timeTicker.h"
 
 
 #define WIDTH 800
@@ -27,8 +28,6 @@
 #define PTZ 15
 #define PTMUL 160
 
-bool IsRunning=false;
-uint64_t timeDt=0;
 uint32_t *ImageData;
 uint32_t *TextureData;
 Olivec_Canvas textureCanvas;
@@ -109,10 +108,17 @@ void DrawLiness(){
     }
     olivec_line(canvas,0,HIGHT*downMul,WIDTH-1,HIGHT*downMul,0xffffffff);
 }
-void InputDetect(Tigr *screen){
+void InputDetect(Tigr *screen, TimeTicker *ticker, double now){
     if(tigrKeyDown(screen,TK_SPACE)){
-        IsRunning=!IsRunning;
+        TimeTickerSetRunning(ticker, !ticker->running, now);
     }
+    if(tigrKeyDown(screen,TK_UP)){
+        TimeTickerSetTime(ticker, TimeTickerGetTime(ticker, now) + 0.1, now);
+    }
+    if(tigrKeyDown(screen,TK_DOWN)){
+        TimeTickerSetTime(ticker, TimeTickerGetTime(ticker, now) - 0.1, now);
+    }
+    CurTime = TimeTickerGetTime(ticker, now);
     int grad=rand()%100;
     for(int i=0;i<4;++i){
         if(tigrKeyDown(screen,Keys[i])){
@@ -174,34 +180,28 @@ signed main()
     struct Note *nts=malloc(sizeof(struct Note)*25565);
     InitNotes(nts,&Notecount);
     
-    float TpB=60.0/BPM;
+    double TpB=60.0/BPM;
 
     if(sizeof(Keys)/sizeof(char)<4){
         return 1;
     }
-    CurTime+=offset;
-    int adjc=0;
-    float lastDt=-1;
+    TimeTicker ticker;
+    double lastFrameTime = ClockNow();
+    TimeTickerInit(&ticker, CurTime + offset, lastFrameTime);
     while (!tigrClosed(screen)&&!tigrKeyHeld(screen,'Q'))
     {
-        float Dt=tigrTime();
-        if(lastDt>0){
-            float Tmp=Dt;
-
-            Dt=(Dt+lastDt)/2;
-            lastDt=Tmp;
-
-        }else
-        lastDt=Dt;
-        if(IsRunning){
-            CurTime+=Dt;
-            if(CurTime>=0&&engineisstop){
-                engineisstop=false;
-                ma_sound_start(&sound);
-            }
+        double now = ClockNow();
+        double Dt = now - lastFrameTime;
+        lastFrameTime = now;
+        InputDetect(screen, &ticker, now);
+        if(ticker.running && CurTime>=0 && engineisstop){
+            engineisstop=false;
+            ma_sound_start(&sound);
+        }else if(!ticker.running && !engineisstop){
+            engineisstop=true;
+            ma_sound_stop(&sound);
         }
-        float Bts=CurTime/TpB;
-        time_t Fstart=clock();
+        double Bts=CurTime/TpB;
         for(int i=0;i<4;++i)
             AnimaVals[i] = !pressState[i] ? (1.0 - Evaluate(TrackAnimas[i], CurTime)) : ( Evaluate(TrackAnimas[i], CurTime));
         float all=0;
@@ -211,17 +211,6 @@ signed main()
         olivec_blend_color(&addCol,0xaa181818);
         olivec_fill(canvas,addCol);
        
-        InputDetect(screen);
-
-        if(tigrKeyDown(screen,TK_UP)){
-            CurTime+=0.1;
-            adjc++;
-        }
-        if(tigrKeyDown(screen,TK_DOWN)){
-            CurTime-=0.1;
-            adjc--;
-        }
-        
         {
             float triangle_angle = 0.5f * PI * CurTime;
 
@@ -263,17 +252,12 @@ signed main()
         char str1[32];
         char str2[32];
         sprintf(str1,"%d %7.5lf %7.5lf",Notecount,CurTime,Bts);
-        float Fdt=((float)(clock()-Fstart))/CLOCKS_PER_SEC*1000;
         sprintf(str2,"dt equ %7.5lf  q 2 quit",Dt);
         olivec_text(canvas,str1,10,HIGHT-100,olivec_default_font,2,0xffFFBF00);
         olivec_text(canvas,str2,10,HIGHT-100+20,olivec_default_font,2,0xffFFBF00);
         const char ct[]="space 2 ctn and q 2 qt";
         const char ct2[]="olivec is fucking good";
-        if(!IsRunning){
-            if (!engineisstop){
-                engineisstop=true;
-                ma_sound_stop(&sound);
-            }
+        if(!ticker.running){
             olivec_rect(canvas,0,0,WIDTH-1,HIGHT-1,0xaa000000);
             olivec_text(canvas,ct,WIDTH/2-((sizeof(ct)/sizeof(char))*olivec_default_font.width/2)*4,HIGHT/2-100,olivec_default_font,4,0xffffffff);
             olivec_text(canvas,ct2,WIDTH/2-((sizeof(ct2)/sizeof(char))*olivec_default_font.width/2)*4,HIGHT/2,olivec_default_font,4,0xffffffff);
